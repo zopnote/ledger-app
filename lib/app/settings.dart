@@ -1,40 +1,37 @@
 import 'package:flutter/material.dart';
-import 'package:ledger_app/app/svd_data.dart';
 import 'package:ledger_app/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 final class SettingsPage extends StatefulWidget {
-  const SettingsPage({super.key});
+  const SettingsPage({super.key, required this.prefs});
 
+  final SharedPreferences prefs;
   @override
   State<SettingsPage> createState() => _SettingsPageState();
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  late final SharedPreferences prefs;
-
   bool loaded = false;
+
   @override
   void initState() {
-    loadPreferences();
+    load();
     super.initState();
   }
 
-  Future<void> loadPreferences() async {
-    prefs = await SharedPreferences.getInstance();
-    prefs.get("business_name");
-    setState(() {
-      loaded = true;
-    });
+  final String prefsKey = "business_name";
+  Future<void> load() async {
+    widget.prefs.get(prefsKey);
+    setState(() => loaded = true);
   }
 
-  final Map<String, String> moneyOptionsNames = const {
+  final Map<String, String> moneyOptions = const {
     "tax_id": "USt-ID",
     "tax_share": "Umsatzsteuer (in %)",
     "currency": "Währung (Kürzel)",
   };
 
-  final Map<String, String> businessOptionsNames = const {
+  final Map<String, String> businessOptions = const {
     "business_name": "Name",
     "business_address_primary": "Adresszeile 1",
     "business_address_secondary": "Adresszeile 2",
@@ -42,10 +39,13 @@ class _SettingsPageState extends State<SettingsPage> {
     "business_phone": "Telefon",
     "business_tax_id": "USt-ID",
   };
+
   @override
   Widget build(BuildContext context) {
     if (!loaded) {
-      return Center();
+      return Center(
+        child: Text("Lade...", style: TextStyle(color: foregroundColor)),
+      );
     }
     return Center(
       child: SizedBox(
@@ -55,44 +55,27 @@ class _SettingsPageState extends State<SettingsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.start,
           children:
-              [
-                Text(
-                  "Unternehmensdaten",
-                  style: TextStyle(fontSize: 28, color: foregroundColor),
-                ),
-                SizedBox(height: 15),
-              ] +
-              List.generate(businessOptions.length, (index) {
-                return TextFieldSetting(
-                  name: businessOptionsNames[businessOptions[index]]!,
-                  save: (newValue) => prefs.setString(
-                    businessOptions[index],
-                    newValue,
-                  ),
-                  value: prefs.getString(businessOptions[index]),
-                );
-              }) + [
-                SizedBox(height: 25),
-                Text(
-                  "Finanzoptionen",
-                  style: TextStyle(fontSize: 28, color: foregroundColor),
-                ),
-                SizedBox(height: 15),
-              ] +
-                  List.generate(moneyOptions.length, (index) {
-                    return TextFieldSetting(
-                      name: moneyOptionsNames[moneyOptions[index]]!,
-                      save: (newValue) => prefs.setString(
-                        moneyOptions[index],
-                        newValue,
-                      ),
-                      value: prefs.getString(moneyOptions[index]),
-                    );
-                  }),
+              getSettingsList(businessOptions, "Unternehmensdaten") +
+              getSettingsList(moneyOptions, "Finanzdaten"),
         ),
       ),
     );
   }
+
+  List<Widget> getSettingsList(Map<String, String> input, String title) =>
+      [
+        SizedBox(height: 25),
+        Text(title, style: TextStyle(fontSize: 28, color: foregroundColor)),
+        SizedBox(height: 15),
+      ] +
+      List.generate(input.length, (index) {
+        return TextFieldSetting(
+          name: input[input.keys.elementAt(index)]!,
+          save: (newValue) =>
+              widget.prefs.setString(input.keys.elementAt(index), newValue),
+          value: widget.prefs.getString(input.keys.elementAt(index)),
+        );
+      });
 }
 
 final class TextFieldSetting extends StatefulWidget {
@@ -106,6 +89,7 @@ final class TextFieldSetting extends StatefulWidget {
   final String name;
 
   final String? value;
+
   final Function(String value) save;
 
   @override
@@ -114,13 +98,15 @@ final class TextFieldSetting extends StatefulWidget {
 
 class _TextFieldSettingState extends State<TextFieldSetting> {
   late final TextEditingController controller;
+
+  bool saved = false;
+
   @override
   void initState() {
     controller = TextEditingController(text: widget.value);
     super.initState();
   }
 
-  bool saved = false;
   @override
   Widget build(BuildContext context) => SizedBox(
     height: 40,
@@ -166,13 +152,9 @@ class _TextFieldSettingState extends State<TextFieldSetting> {
           ),
           onPressed: () async {
             widget.save(controller.text);
-            setState(() {
-              saved = true;
-            });
+            setState(() => saved = true);
             await Future.delayed(Duration(milliseconds: 1500));
-            setState(() {
-              saved = false;
-            });
+            setState(() => saved = false);
           },
           child: Icon(saved ? Icons.check : Icons.save),
         ),

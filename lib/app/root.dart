@@ -1,18 +1,12 @@
 import 'package:ledger_app/app/items.dart';
 import 'package:ledger_app/app/printer.dart';
 import 'package:ledger_app/app/settings.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sidebarx/sidebarx.dart';
 import 'package:flutter/material.dart';
 
 import '../main.dart';
 import 'checkout.dart';
-
-final Map<String, Widget> pages = {
-  "Artikel verbuchen": CheckoutPage(),
-  "Artikelregister": ItemsPage(),
-  "Drucker": PrinterPage(),
-  "Einstellungen": SettingsPage()
-};
 
 final class App extends StatefulWidget {
   const App({super.key});
@@ -22,24 +16,47 @@ final class App extends StatefulWidget {
 }
 
 class _AppState extends State<App> {
+
+  late final Map<String, Widget> pages;
+
   late final SidebarXController sidebarController;
+
   final _key = GlobalKey<ScaffoldState>();
+
   int selected = 0;
+
+  bool loaded = false;
+
+  Future<void> loadPreferences() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    pages = {
+      "Artikel verbuchen": CheckoutPage(),
+      "Artikelregister": ItemsPage(prefs: prefs),
+      "Drucker": PrinterPage(),
+      "Einstellungen": SettingsPage(prefs: prefs),
+    };
+    setState(() => loaded = true);
+  }
+
   @override
   void initState() {
+    loadPreferences();
     bool initialized = false;
-    sidebarController = SidebarXController(selectedIndex: 0, extended: false)
-      ..addListener(
-        () => setState(() {
-          selected = initialized ? sidebarController.selectedIndex : 0;
-          initialized = true;
-        }),
-      );
+    sidebarController = SidebarXController(selectedIndex: 0, extended: false);
+    sidebarController.addListener(
+      () => setState(() {
+        selected = initialized ? sidebarController.selectedIndex : 0;
+        initialized = true;
+      }),
+    );
     super.initState();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!loaded) {
+      return SizedBox();
+    }
     return SafeArea(
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -53,12 +70,8 @@ class _AppState extends State<App> {
               decoration: BoxDecoration(color: barColor),
               textStyle: TextStyle(color: foregroundColor),
               iconTheme: IconThemeData(color: foregroundColor),
-              selectedTextStyle: TextStyle(
-                color: primaryColor,
-              ),
-              selectedIconTheme: IconThemeData(
-                color: primaryColor,
-              ),
+              selectedTextStyle: TextStyle(color: primaryColor),
+              selectedIconTheme: IconThemeData(color: primaryColor),
             ),
             showToggleButton: false,
             items: [
@@ -71,9 +84,8 @@ class _AppState extends State<App> {
           body: ListView(
             children: [
               Container(
-                decoration: BoxDecoration(
-                  color: barColor,
-                ),
+                height: 50,
+                decoration: BoxDecoration(color: barColor),
                 child: Row(
                   children: [
                     ElevatedButton(
@@ -81,25 +93,30 @@ class _AppState extends State<App> {
                         fixedSize: WidgetStatePropertyAll(Size(60, 60)),
                         iconSize: WidgetStatePropertyAll(22),
                         backgroundColor: WidgetStatePropertyAll(barColor),
-                        foregroundColor: WidgetStatePropertyAll(foregroundColor),
+                        foregroundColor: WidgetStatePropertyAll(
+                          foregroundColor,
+                        ),
                         elevation: WidgetStatePropertyAll(0),
-                        overlayColor: WidgetStatePropertyAll(Color.from(alpha: 0.0, red: primaryColor.r, green: primaryColor.g, blue: primaryColor.b))
+                        overlayColor: WidgetStatePropertyAll(
+                          Color.from(
+                            alpha: 0.0,
+                            red: primaryColor.r,
+                            green: primaryColor.g,
+                            blue: primaryColor.b,
+                          ),
+                        ),
                       ),
                       onPressed: () => _key.currentState?.openDrawer(),
                       child: Icon(Icons.menu),
                     ),
-                    Text(pages.keys.elementAt(selected), style: TextStyle(
-                      color: foregroundColor,
-                      fontSize: 18
-                    ),)
+                    Text(
+                      pages.keys.elementAt(selected),
+                      style: TextStyle(color: foregroundColor, fontSize: 18),
+                    ),
                   ],
                 ),
               ),
-              SizedBox(
-                height: MediaQuery.sizeOf(context).height-120,
-                width: MediaQuery.sizeOf(context).width,
-                child: pages.values.elementAt(selected),
-              ),
+              pages.values.elementAt(selected),
             ],
           ),
         ),
